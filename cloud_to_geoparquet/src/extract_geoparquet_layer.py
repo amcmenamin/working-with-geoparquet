@@ -1,5 +1,6 @@
 import duckdb
 import logging
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -12,6 +13,7 @@ except ModuleNotFoundError:
 
 config = Config()
 url_path = config.url_path
+data_path = config.data_path
 layer_name = "airport"
 export_folder = Path("exports")
 
@@ -46,9 +48,15 @@ class GeoParquetLayer:
 		layer_name: str,
 		bbox: str | tuple[float, float, float, float] = "NZ_MAINLAND",
 		export_folder: str | Path = export_folder,
+		data_path: str = "{layer_name}/latest/",
+		date: str | None = None,
+		theme: str | None = None,
 	) -> None:
 		self.url_path = url_path.rstrip("/")
 		self.layer_name = layer_name
+		self.data_path = data_path
+		self.date = date
+		self.theme = theme
 		self.bbox = bbox
 		self.export_folder = Path(export_folder)
 
@@ -71,11 +79,24 @@ class GeoParquetLayer:
 
 	@property
 	def parquet_url(self) -> str:
-		"""Return the latest GeoParquet URL for this layer."""
-		return (
-			f"{self.url_path}/{self.layer_name}/latest/"
-			f"{self.layer_name}.parquet"
-		)
+		"""Return the configured remote GeoParquet path for this layer."""
+		try:
+			path = self.data_path.format(
+				layer_name=self.layer_name,
+				date=self.date,
+				theme=self.theme,
+			)
+		except KeyError as error:
+			raise ValueError(
+				f"Unsupported placeholder {error.args[0]!r} in data_path"
+			) from error
+		if "{date}" in self.data_path and self.date is None:
+			raise ValueError("date is required by data_path")
+		if "{theme}" in self.data_path and self.theme is None:
+			raise ValueError("theme is required by data_path")
+		if path.endswith("/"):
+			path += f"{self.layer_name}.parquet"
+		return f"{self.url_path}/{path.lstrip('/')}"
 
 	@property
 	def output_path(self) -> Path:
@@ -124,6 +145,7 @@ class GeoParquetLayer:
 
 		query = "SELECT * FROM read_parquet(?) WHERE " + " OR ".join(conditions)
 		connection = duckdb.connect()
+		connection.execute("SET allow_asterisks_in_http_paths = true")
 		connection.execute("INSTALL spatial")
 		connection.execute("LOAD spatial")
 		return connection.execute(query, query_parameters).fetchall()
@@ -179,6 +201,7 @@ class GeoParquetLayer:
 			"(FORMAT PARQUET, COMPRESSION ZSTD)"
 		)
 		connection = duckdb.connect()
+		connection.execute("SET allow_asterisks_in_http_paths = true")
 		connection.execute("INSTALL spatial")
 		connection.execute("LOAD spatial")
 		connection.execute(copy_query)
@@ -187,16 +210,31 @@ class GeoParquetLayer:
 
 def main() -> None:
 	"""Export airports in mainland New Zealand and selected offshore islands."""
-	airport_layer = GeoParquetLayer(url_path, layer_name, export_folder=export_folder)
-	airport_layer.export_folder.mkdir(parents=True, exist_ok=True)
+	starttime = datetime.now()
+	print(f"Running Process: {starttime}")
+	geoparquet_layer = GeoParquetLayer(
+		url_path,
+		layer_name,
+		export_folder=export_folder,
+		data_path=data_path,
+	)
+	geoparquet_layer.export_folder.mkdir(parents=True, exist_ok=True)
 	logging.basicConfig(
-		filename=airport_layer.export_folder / "extract_geoparquet.log",
+		filename=geoparquet_layer.export_folder / "extract_geoparquet.log",
 		level=logging.INFO,
 		format="%(asctime)s %(levelname)s %(message)s",
 	)
-	output_path, copy_query = airport_layer.export_new_zealand()
+	output_path, copy_query = geoparquet_layer.export_new_zealand()
+	endtime = datetime.now()
+	delta = endtime - starttime
 	print(f"Exported airports to {output_path}")
+	print(f"Start time: {starttime}")
+	print(f"End time: {endtime}")
+	print(f"Elapsed time: {delta}")
 	logging.info("COPY SQL for %s:\n%s", layer_name, copy_query)
+	logging.info("Start time: %s", starttime)
+	logging.info("End time: %s", endtime)
+	logging.info("Elapsed time: %s", delta)
 
 
 if __name__ == "__main__":

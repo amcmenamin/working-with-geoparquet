@@ -34,10 +34,16 @@ class Config:
 			url_path_config if url_path_config is not None else "url_data_paths.yml"
 		)
 		self.url_data_paths = self._load_mapping(self.url_path_config)
+		url_config = self._get_mapping(self.url_data_paths, url_data_path)
 		self.url_path = self._get_string(
-			self.url_data_paths,
-			url_data_path,
+			url_config,
+			"url",
 			"URL data path",
+		)
+		self.data_path = self._get_string(
+			url_config,
+			"data_path",
+			"Data path",
 		)
 
 	def _load_mapping(self, filename: str | Path) -> dict[str, Any]:
@@ -61,6 +67,13 @@ class Config:
 		value = values.get(key)
 		if not isinstance(value, str) or not value:
 			raise ValueError(f"{label} {key!r} must have a non-empty string value")
+		return value
+
+	@staticmethod
+	def _get_mapping(values: dict[str, Any], key: str) -> dict[str, Any]:
+		value = values.get(key)
+		if not isinstance(value, dict):
+			raise ValueError(f"URL data path {key!r} must be a mapping")
 		return value
 
 	def get_layer_theme(self, layer_name: str) -> str | None:

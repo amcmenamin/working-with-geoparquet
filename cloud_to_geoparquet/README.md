@@ -95,6 +95,36 @@ uv run python -m src.run_extract_geoparquet --layer-names building_point --exten
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --export-folder data/exports
 ```
 
+### Overture Sources
+
+The URL configuration keeps the remote base in `url` and the relative source
+template in `data_path`. The extractor combines them into the full remote
+path. Overture templates also use the layer theme from `nztopo_layers.yml`
+and require a release date.
+
+For example, extract Overture buildings intersecting the Hamilton urban area
+from either supported Overture source:
+
+```powershell
+# Overture S3
+uv run python -m src.run_extract_geoparquet `
+	--layer-names building `
+	--url-data-path overture `
+	--release-date 2024-08-20.0 `
+	--bbox-name HAMILTON_URBAN_AREA
+
+# Overture Azure Blob Storage
+uv run python -m src.run_extract_geoparquet `
+	--layer-names building `
+	--url-data-path overture-azure `
+	--release-date 2024-08-20.0 `
+	--bbox-name HAMILTON_URBAN_AREA
+```
+
+The resulting source path for the S3 example is
+`s3://overturemaps-us-west-2/release/2024-08-20.0/theme=buildings/type=building/*`.
+Use a release date present in the selected Overture source.
+
 Supported `--bbox-name` values:
 
 ```text

@@ -73,6 +73,11 @@ def parse_arguments() -> argparse.Namespace:
 		help="Path to the URL data path YAML file.",
 	)
 	parser.add_argument(
+		"--release-date",
+		metavar="DATE",
+		help="Release date used by data paths containing {date}, such as Overture.",
+	)
+	parser.add_argument(
 		"--export-folder",
 		type=Path,
 		default=EXPORT_FOLDER,
@@ -123,6 +128,9 @@ def main() -> None:
 			layer_name,
 			bbox=bbox,
 			export_folder=export_folder,
+			data_path=url_config.data_path,
+			date=arguments.release_date,
+			theme=url_config.get_layer_theme(layer_name),
 		)
 		if arguments.bbox_name is not None or arguments.extent is not None:
 			output_path, copy_query = layer.export_bbox()

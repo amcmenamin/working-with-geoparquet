@@ -54,14 +54,20 @@ The layer names and themes are defined in `config/nztopo_layers.yml`.
 
 ## URL Data Paths
 
-URL values are defined in `config/url_data_paths.yml`:
+URL bases and relative data path templates are defined in
+`config/url_data_paths.yml`:
 
 ```yaml
-nztopodev: https://d1jzh93b1t1cv.cloudfront.net/data
-overture: s3://overturemaps-us-west-2/release/
+nztopodev:
+  url: https://d1jzh93b1t1cv.cloudfront.net/data
+  data_path: "{layer_name}/latest/"
+overture:
+  url: s3://overturemaps-us-west-2
+  data_path: "release/{date}/theme={theme}/type={layer_name}/*"
 ```
 
-The default is `nztopodev`. Select the configured URL with
+The extractor combines `url` and `data_path` to form the full remote path. The
+default is `nztopodev`. Select the configured source with
 `--url-data-path`:
 
 ```powershell
@@ -70,11 +76,24 @@ uv run python -m run_extract_geoparquet `
   --layer-names airport `
   --url-data-path nztopodev
 
-# overture
+# overture S3
 uv run python -m run_extract_geoparquet `
-  --layer-names airport `
-  --url-data-path overture
+  --layer-names building `
+  --url-data-path overture `
+  --release-date 2026-09-23.1 `
+  --bbox-name HAMILTON_URBAN_AREA
+
+# overture Azure Blob Storage
+uv run python -m run_extract_geoparquet `
+  --layer-names building `
+  --url-data-path overture-azure `
+  --release-date 2026-09-23.1 `
+  --bbox-name HAMILTON_URBAN_AREA
 ```
+
+The Overture examples use the `building` layer, whose configured theme is
+`buildings`. Replace `2024-08-20.0` with a release available from the selected
+source.
 
 Use `--url-path-config` when the URL keys are stored in another YAML file:
 
@@ -245,6 +264,31 @@ uv run python -m run_extract_geoparquet `
   --export-folder C:\temp\exports
 ```
 
+Run the Overture buildings layer for the Hamilton urban area from S3:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names building `
+  --bbox-name HAMILTON_URBAN_AREA `
+  --url-data-path overture `
+  --release-date 2026-09-23.1 `
+  --export-folder C:\temp\exports
+```
+
+The same Hamilton example using Overture Azure Blob Storage:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names building `
+  --bbox-name HAMILTON_URBAN_AREA `
+  --url-data-path overture-azure `
+  --release-date 2026-09-23.1 `
+  --export-folder C:\temp\exports
+```
+
+The `building` layer resolves to the Overture `buildings` theme. Replace the
+release date with one available from the selected Overture source.
+
 The same example runs from Windows Command Prompt use `^` for line
 continuation:
 
@@ -274,6 +318,28 @@ Run all configured layers using the default NZ regional coverage:
 uv run python -m run_extract_geoparquet ^
   --layer-config config/nztopo_layers.yml ^
   --url-data-path nztopodev ^
+  --export-folder C:\temp\exports
+```
+
+Run the Overture buildings layer for the Hamilton urban area from S3:
+
+```cmd
+uv run python -m run_extract_geoparquet ^
+  --layer-names building ^
+  --bbox-name HAMILTON_URBAN_AREA ^
+  --url-data-path overture ^
+  --release-date 2026-09-23.1 ^
+  --export-folder C:\temp\exports
+```
+
+The same Hamilton example using Overture Azure Blob Storage:
+
+```cmd
+uv run python -m run_extract_geoparquet ^
+  --layer-names building ^
+  --bbox-name HAMILTON_URBAN_AREA ^
+  --url-data-path overture-azure ^
+  --release-date 2026-09-23.1 ^
   --export-folder C:\temp\exports
 ```
 

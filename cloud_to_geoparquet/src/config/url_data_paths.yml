@@ -1,3 +1,13 @@
-nztopodev: https://d1jzh93b1t1cv.cloudfront.net/data
-overture: s3://overturemaps-us-west-2/release/
-fused_overture: https://data.source.coop/fused/overture
+nztopodev: 
+  url: https://d1jzh93b1t1cv.cloudfront.net/data
+  # This will get translated in code to example:
+  # airport/latest/
+  data_path: "{layer_name}/latest/"
+overture: 
+  url: s3://overturemaps-us-west-2
+  # This will get translated in code to example:
+  # release/2024-08-20.0/theme=buildings/type=building/*'
+  data_path: "release/{date}/theme={theme}/type={layer_name}/*"
+overture-azure: 
+  url: https://overturemapswestus2.blob.core.windows.net
+  data_path: "release/{date}/theme={theme}/type={layer_name}/"
