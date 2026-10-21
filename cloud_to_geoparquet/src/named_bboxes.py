@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 from typing import Mapping
 
 import yaml
@@ -12,11 +13,17 @@ class NamedBBoxes:
 
 	def __init__(self, name: str = "nz", config_folder: str | Path | None = None) -> None:
 		self.name = name
-		self.config_folder = (
-			Path(config_folder)
-			if config_folder is not None
-			else Path(__file__).with_name("config")
-		)
+		if config_folder is not None:
+			self.config_folder = Path(config_folder)
+		elif getattr(sys, "frozen", False):
+			external_config = Path(sys.executable).parent / "config"
+			self.config_folder = (
+				external_config
+				if external_config.is_dir()
+				else Path(__file__).with_name("config")
+			)
+		else:
+			self.config_folder = Path(__file__).with_name("config")
 		self.path = self.config_folder / f"{name}_names_bboxes.yml"
 		self.bboxes = self._load()
 

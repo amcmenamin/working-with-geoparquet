@@ -40,6 +40,10 @@ uv run python -m run_extract_geoparquet
 The runner writes GeoParquet files and an `extract_geoparquet.log` file under
 `exports`.
 
+For manual runs and PyInstaller executable builds, see
+[PYINSTALLER.md](PYINSTALLER.md). Its commands run from the project root;
+the source-module commands in this guide continue to run from `src`.
+
 ## Select Layers
 
 Use `--layer-names` with a comma-separated list:

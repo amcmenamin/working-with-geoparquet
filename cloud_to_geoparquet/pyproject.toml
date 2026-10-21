@@ -1,10 +1,19 @@
 [project]
-name = "geoparquet"
+name = "cloud-to-geoparquet-extractor"
 version = "0.1.0"
 description = "Extract geoparquet file from cloud using bbox"
+authors = [{name = "Andrew McMenamin"}]
 readme = "README.md"
+license = "MIT"
+keywords = ["geospatial", "geoparquet", "GIS"]
 requires-python = ">=3.11"
 dependencies = [
 	"duckdb>=1.3",
 	"pyyaml>=6.0",
+]
+
+[dependency-groups]
+binary = [
+	"pyinstaller>=6.22.3",
+	"pyinstaller-hooks-contrib>=2026.9",
 ]
