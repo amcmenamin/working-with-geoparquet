@@ -5,6 +5,8 @@ extractor. Run the Python commands from the `src` folder.
 
 Note: This is similar to the QGIS Plugin that supports downloading geoparquet via QGIS extent. See: https://github.com/cholmes/qgis_plugin_gpq_downloader/
 
+Note: Overture also has its own download tools and library: See: https://github.com/OvertureMaps/overturemaps-py/blob/main/README.md
+
 ## Default Configuration
 
 When no configuration options are supplied, the runner uses:
@@ -52,7 +54,19 @@ Or use `--layer-config` with a YAML file whose keys are layer names:
 uv run python -m run_extract_geoparquet --layer-config config/nztopo_layers.yml
 ```
 
-The layer names and themes are defined in `config/nztopo_layers.yml`.
+The layer names and themes are defined in `config/nztopo_layers.yml`. Use
+`--theme` with `--layer-config` to export every layer whose theme matches the
+specified value:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-config config/nztopo_layers.yml `
+  --theme landcover `
+  --bbox-name HAMILTON_URBAN_AREA
+```
+
+This selects layers such as `coastline`, `landcover`, and `marine`, which are
+configured with the `landcover` theme. Theme matching is case-sensitive.
 
 ## URL Data Paths
 

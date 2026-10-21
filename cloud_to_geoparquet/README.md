@@ -93,7 +93,12 @@ uv run python -m src.run_extract_geoparquet --layer-names airport --bbox-name CH
 uv run python -m src.run_extract_geoparquet --layer-names airport,building_point
 uv run python -m src.run_extract_geoparquet --layer-names building_point --extent 174.7,-41.4,174.9,-41.2
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --export-folder data/exports
+uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --theme landcover
 ```
+
+`--theme` selects every layer in the layer configuration whose theme matches
+the supplied value. For example, `--theme landcover` selects layers such as
+`coastline`, `landcover`, and `marine`.
 
 ### Overture Sources
 

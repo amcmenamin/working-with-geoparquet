@@ -66,6 +66,11 @@ def parse_arguments() -> argparse.Namespace:
 		help="URL data path key from the URL config (default: %(default)s).",
 	)
 	parser.add_argument(
+		"--theme",
+		metavar="THEME",
+		help="Export all layers in the layer configuration with this theme.",
+	)
+	parser.add_argument(
 		"--url-path-config",
 		type=Path,
 		default=CONFIG.url_path_config,
@@ -101,6 +106,8 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
 	"""Export the selected layers using the requested or default bbox coverage."""
 	arguments = parse_arguments()
+	if arguments.layer_names is not None and arguments.theme is not None:
+		raise ValueError("--layer-names and --theme cannot be used together")
 	export_folder = (
 		arguments.export_folder / arguments.bbox_name.lower()
 		if arguments.bbox_name is not None
@@ -112,12 +119,31 @@ def main() -> None:
 		level=logging.INFO,
 		format="%(asctime)s %(levelname)s %(message)s",
 	)
-	selected_layers = arguments.layer_names or LAYER_NAMES
-	if arguments.layer_config is not None:
-		selected_layers = tuple(Config(layer_file=arguments.layer_config).layers)
+	layer_config = (
+		Config(layer_file=arguments.layer_config)
+		if arguments.layer_config is not None
+		else CONFIG
+	)
+	if arguments.layer_names is not None:
+		selected_layers = arguments.layer_names
+	elif arguments.theme is not None:
+		selected_layers = tuple(
+			layer_name
+			for layer_name, layer_theme in layer_config.layers.items()
+			if layer_theme == arguments.theme
+		)
+		if not selected_layers:
+			raise ValueError(
+				f"No layers found with theme {arguments.theme!r}"
+			)
+	elif arguments.layer_config is not None:
+		selected_layers = tuple(layer_config.layers)
+	else:
+		selected_layers = LAYER_NAMES
 	url_config = Config(
 		url_data_path=arguments.url_data_path,
 		url_path_config=arguments.url_path_config,
+		layer_file=arguments.layer_config,
 	)
 	for layer_name in selected_layers:
 		bbox = arguments.bbox_name or (
