@@ -131,6 +131,7 @@ def main() -> None:
 			data_path=url_config.data_path,
 			date=arguments.release_date,
 			theme=url_config.get_layer_theme(layer_name),
+			url_data_path=url_config.url_data_path,
 		)
 		if arguments.bbox_name is not None or arguments.extent is not None:
 			output_path, copy_query = layer.export_bbox()

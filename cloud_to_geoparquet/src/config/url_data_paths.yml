@@ -2,12 +2,20 @@ nztopodev:
   url: https://d1jzh93b1t1cv.cloudfront.net/data
   # This will get translated in code to example:
   # airport/latest/
-  data_path: "{layer_name}/latest/"
+  data_path: "{layer_name}/latest/{layer_name}.parquet"
 overture: 
+  # Note overtype has its own python exe and library: https://github.com/OvertureMaps/overturemaps-py
   url: s3://overturemaps-us-west-2
   # This will get translated in code to example:
   # release/2024-08-20.0/theme=buildings/type=building/*'
   data_path: "release/{date}/theme={theme}/type={layer_name}/*"
-overture-azure: 
-  url: https://overturemapswestus2.blob.core.windows.net
-  data_path: "release/{date}/theme={theme}/type={layer_name}/"
+openstreetmap-layerlake:
+  # see: https://layercake.openstreetmap.us/layers/
+  # example: https://data.openstreetmap.us/layercake/buildings.parquet
+  url: https://data.openstreetmap.us
+  data_path: "/layercake/{layer_name}.parquet"
+microsoft_roads-source_coop: 
+  # https://data.source.coop/nlebovits/microsoft-ml-road-detections/road-detections/by_country/country=NZL/NZL.parquet
+  # layer_name = country code, e.g., NZL for New Zealand
+  url: https://data.source.coop
+  data_path: nlebovits/microsoft-ml-road-detections/road-detections/by_country/country={layer_name}/{layer_name}

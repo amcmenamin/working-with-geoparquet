@@ -51,12 +51,14 @@ class GeoParquetLayer:
 		data_path: str = "{layer_name}/latest/",
 		date: str | None = None,
 		theme: str | None = None,
+		url_data_path: str = "nztopodev",
 	) -> None:
 		self.url_path = url_path.rstrip("/")
 		self.layer_name = layer_name
 		self.data_path = data_path
 		self.date = date
 		self.theme = theme
+		self.url_data_path = url_data_path
 		self.bbox = bbox
 		self.export_folder = Path(export_folder)
 
@@ -95,13 +97,13 @@ class GeoParquetLayer:
 		if "{theme}" in self.data_path and self.theme is None:
 			raise ValueError("theme is required by data_path")
 		if path.endswith("/"):
-			path += f"{self.layer_name}.parquet"
+			path += "*.parquet"
 		return f"{self.url_path}/{path.lstrip('/')}"
 
 	@property
 	def output_path(self) -> Path:
 		"""Return the GeoParquet export path for this layer."""
-		return self.export_folder / f"{self.layer_name}.parquet"
+		return self.export_folder / self.url_data_path / f"{self.layer_name}.parquet"
 
 	def query_bbox(
 		self, bbox: tuple[float, float, float, float] | None = None
@@ -194,7 +196,7 @@ class GeoParquetLayer:
 				literal = str(query_parameter)
 			select_query = select_query.replace("?", literal, 1)
 
-		self.export_folder.mkdir(parents=True, exist_ok=True)
+		self.output_path.parent.mkdir(parents=True, exist_ok=True)
 		escaped_output_path = str(self.output_path).replace("'", "''")
 		copy_query = (
 			f"COPY ({select_query}) TO '{escaped_output_path}' "
@@ -217,6 +219,7 @@ def main() -> None:
 		layer_name,
 		export_folder=export_folder,
 		data_path=data_path,
+		url_data_path=config.url_data_path,
 	)
 	geoparquet_layer.export_folder.mkdir(parents=True, exist_ok=True)
 	logging.basicConfig(

@@ -103,7 +103,7 @@ path. Overture templates also use the layer theme from `nztopo_layers.yml`
 and require a release date.
 
 For example, extract Overture buildings intersecting the Hamilton urban area
-from either supported Overture source:
+from the Overture S3 source:
 
 ```powershell
 # Overture S3
@@ -113,12 +113,6 @@ uv run python -m src.run_extract_geoparquet `
 	--release-date 2024-08-20.0 `
 	--bbox-name HAMILTON_URBAN_AREA
 
-# Overture Azure Blob Storage
-uv run python -m src.run_extract_geoparquet `
-	--layer-names building `
-	--url-data-path overture-azure `
-	--release-date 2024-08-20.0 `
-	--bbox-name HAMILTON_URBAN_AREA
 ```
 
 The resulting source path for the S3 example is

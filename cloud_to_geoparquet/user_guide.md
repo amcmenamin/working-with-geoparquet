@@ -3,6 +3,8 @@
 This guide covers the configuration and export options for the GeoParquet layer
 extractor. Run the Python commands from the `src` folder.
 
+Note: This is similar to the QGIS Plugin that supports downloading geoparquet via QGIS extent. See: https://github.com/cholmes/qgis_plugin_gpq_downloader/
+
 ## Default Configuration
 
 When no configuration options are supplied, the runner uses:
@@ -83,12 +85,6 @@ uv run python -m run_extract_geoparquet `
   --release-date 2026-09-23.1 `
   --bbox-name HAMILTON_URBAN_AREA
 
-# overture Azure Blob Storage
-uv run python -m run_extract_geoparquet `
-  --layer-names building `
-  --url-data-path overture-azure `
-  --release-date 2026-09-23.1 `
-  --bbox-name HAMILTON_URBAN_AREA
 ```
 
 The Overture examples use the `building` layer, whose configured theme is
@@ -223,8 +219,9 @@ guide for installation and troubleshooting details.
 
 ## Output And Logging
 
-Each exported layer is written as `<layer_name>.parquet`. The runner also logs
-the generated DuckDB `COPY` SQL to:
+Each exported layer is written below a folder named for the selected
+`url_data_path`, as `<export-folder>/<url_data_path>/<layer_name>.parquet`.
+The runner also logs the generated DuckDB `COPY` SQL to:
 
 ```text
 <export-folder>/extract_geoparquet.log
@@ -275,17 +272,6 @@ uv run python -m run_extract_geoparquet `
   --export-folder C:\temp\exports
 ```
 
-The same Hamilton example using Overture Azure Blob Storage:
-
-```powershell
-uv run python -m run_extract_geoparquet `
-  --layer-names building `
-  --bbox-name HAMILTON_URBAN_AREA `
-  --url-data-path overture-azure `
-  --release-date 2026-09-23.1 `
-  --export-folder C:\temp\exports
-```
-
 The `building` layer resolves to the Overture `buildings` theme. Replace the
 release date with one available from the selected Overture source.
 
@@ -328,17 +314,6 @@ uv run python -m run_extract_geoparquet ^
   --layer-names building ^
   --bbox-name HAMILTON_URBAN_AREA ^
   --url-data-path overture ^
-  --release-date 2026-09-23.1 ^
-  --export-folder C:\temp\exports
-```
-
-The same Hamilton example using Overture Azure Blob Storage:
-
-```cmd
-uv run python -m run_extract_geoparquet ^
-  --layer-names building ^
-  --bbox-name HAMILTON_URBAN_AREA ^
-  --url-data-path overture-azure ^
   --release-date 2026-09-23.1 ^
   --export-folder C:\temp\exports
 ```
