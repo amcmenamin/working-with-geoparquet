@@ -209,6 +209,47 @@ class GeoParquetLayer:
 		connection.execute(copy_query)
 		return self.output_path, copy_query
 
+	def split_geometry_types(self, input_path: str | Path | None = None) -> tuple[Path, ...]:
+		"""Split an exported GeoParquet file into one file per geometry type."""
+		source_path = Path(input_path) if input_path is not None else self.output_path
+		if not source_path.is_file():
+			raise FileNotFoundError(f"GeoParquet export not found: {source_path}")
+
+		connection = duckdb.connect()
+		connection.execute("INSTALL spatial")
+		connection.execute("LOAD spatial")
+		geometry_types = connection.execute(
+			"""
+			SELECT DISTINCT ST_GeometryType(geometry)::VARCHAR AS geometry_type
+			FROM read_parquet(?)
+			ORDER BY geometry_type NULLS LAST
+			""",
+			[str(source_path)],
+		).fetchall()
+		escaped_source_path = str(source_path).replace("'", "''")
+		output_paths = []
+		for (geometry_type,) in geometry_types:
+			geometry_label = "null" if geometry_type is None else geometry_type.lower()
+			geometry_output_path = source_path.with_name(
+				f"{source_path.stem}_{geometry_label}{source_path.suffix}"
+			)
+			escaped_output_path = str(geometry_output_path).replace("'", "''")
+			if geometry_type is None:
+				where_clause = "geometry IS NULL"
+			else:
+				escaped_geometry_type = geometry_type.replace("'", "''")
+				where_clause = (
+					f"ST_GeometryType(geometry) = '{escaped_geometry_type}'"
+				)
+			copy_query = (
+				f"COPY (SELECT * FROM read_parquet('{escaped_source_path}') "
+				f"WHERE {where_clause}) TO '{escaped_output_path}' "
+				"(FORMAT PARQUET, COMPRESSION ZSTD)"
+			)
+			connection.execute(copy_query)
+			output_paths.append(geometry_output_path)
+		return tuple(output_paths)
+
 
 def main() -> None:
 	"""Export airports in mainland New Zealand and selected offshore islands."""

@@ -94,11 +94,18 @@ uv run python -m src.run_extract_geoparquet --layer-names airport,building_point
 uv run python -m src.run_extract_geoparquet --layer-names building_point --extent 174.7,-41.4,174.9,-41.2
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --export-folder data/exports
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --theme landcover
+uv run python -m src.run_extract_geoparquet --layer-names buildings --url-data-path openstreetmap-layerlake --split-geometry-types
 ```
 
 `--theme` selects every layer in the layer configuration whose theme matches
 the supplied value. For example, `--theme landcover` selects layers such as
 `coastline`, `landcover`, and `marine`.
+
+`--split-geometry-types` reloads each completed export and writes an additional
+file for every geometry type. For example, `buildings.parquet` can produce
+`buildings_point.parquet` and `buildings_polygon.parquet`. Rows with a null
+geometry are written to `buildings_null.parquet`. The original mixed file is
+retained.
 
 ### Overture Sources
 

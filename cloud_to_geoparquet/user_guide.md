@@ -117,6 +117,24 @@ uv run python -m run_extract_geoparquet `
   --url-data-path overture
 ```
 
+## Split Geometry Types
+
+Some sources, including Overture and OpenStreetMap Layercake, can contain
+multiple geometry types in one layer. Use `--split-geometry-types` to reload
+each completed export and create one additional parquet file per type:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names buildings `
+  --url-data-path openstreetmap-layerlake `
+  --split-geometry-types
+```
+
+For an export named `buildings.parquet`, the additional files use names such
+as `buildings_point.parquet` and `buildings_polygon.parquet`. Null geometries
+are retained in `buildings_null.parquet`, and the original mixed export is not
+removed.
+
 ## Named Bboxes
 
 Named bboxes are defined in `config/nz_names_bboxes.yml`.
@@ -171,6 +189,12 @@ Export the configured New Zealand mainland and offshore regions:
 
 ```python
 output_path, copy_sql = layer.export_new_zealand()
+```
+
+Split an existing export by geometry type:
+
+```python
+split_paths = layer.split_geometry_types(output_path)
 ```
 
 Set a different output folder with `export_folder`:

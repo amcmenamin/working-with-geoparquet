@@ -88,6 +88,11 @@ def parse_arguments() -> argparse.Namespace:
 		default=EXPORT_FOLDER,
 		help="Folder for GeoParquet files and extract_geoparquet.log (default: %(default)s).",
 	)
+	parser.add_argument(
+		"--split-geometry-types",
+		action="store_true",
+		help="Split each exported file into one additional file per geometry type.",
+	)
 	bbox_group = parser.add_mutually_exclusive_group()
 	bbox_group.add_argument(
 		"--bbox-name",
@@ -165,6 +170,14 @@ def main() -> None:
 			output_path, copy_query = layer.export_new_zealand()
 		print(f"Exported {layer_name} to {output_path}")
 		logger.info("COPY SQL for %s:\n%s", layer_name, copy_query)
+		if arguments.split_geometry_types:
+			for split_output_path in layer.split_geometry_types(output_path):
+				print(f"Exported {layer_name} geometry type to {split_output_path}")
+				logger.info(
+					"Split %s by geometry type to %s",
+					layer_name,
+					split_output_path,
+				)
 
 
 if __name__ == "__main__":
