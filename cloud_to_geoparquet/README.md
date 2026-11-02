@@ -4,6 +4,8 @@ Query a remote GeoParquet 1.1 layer with DuckDB and its `spatial` extension.
 The included example retrieves airport features that intersect the approximate
 mainland New Zealand bounding box.
 
+See the `USER_GUIDE.md` file for instructions / examples on running the application and under `runtime-release\README.md` on using the release executable.
+
 ## Requirements
 
 - Python 3.11 or newer
