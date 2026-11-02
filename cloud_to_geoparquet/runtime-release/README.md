@@ -1,3 +1,8 @@
+# Release
+To access the executable created by pyinstaller go to the latest release and download. 
+
+Note: this is a simple standalone exe and all the support libraries.
+
 # GeoParquet Extractor Runtime
 
 This folder contains the packaged Windows executable copied from
