@@ -1,5 +1,6 @@
 import duckdb
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +30,7 @@ NZ_BBOX_NAMES = (
 	"MACAULEY_CURTIS_ISLANDS",
 )
 NAMED_BBOX_CONFIG = NamedBBoxes()
+QUERY_FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class GeoParquetLayer:
@@ -52,6 +54,7 @@ class GeoParquetLayer:
 		date: str | None = None,
 		theme: str | None = None,
 		url_data_path: str = "nztopodev",
+		query: tuple[tuple[str, object], ...] = (),
 	) -> None:
 		self.url_path = url_path.rstrip("/")
 		self.layer_name = layer_name
@@ -59,6 +62,10 @@ class GeoParquetLayer:
 		self.date = date
 		self.theme = theme
 		self.url_data_path = url_data_path
+		for field, _ in query:
+			if not QUERY_FIELD_PATTERN.fullmatch(field):
+				raise ValueError(f"query field must be a simple identifier: {field!r}")
+		self.query = query
 		self.bbox = bbox
 		self.export_folder = Path(export_folder)
 
@@ -145,7 +152,12 @@ class GeoParquetLayer:
 				[west, east, south, north, west, south, east, north]
 			)
 
-		query = "SELECT * FROM read_parquet(?) WHERE " + " OR ".join(conditions)
+		query = "SELECT * FROM read_parquet(?) WHERE (" + " OR ".join(conditions) + ")"
+		query_parameters.extend(value for _, value in self.query)
+		if self.query:
+			query += " AND " + " AND ".join(
+				f"{field} = ?" for field, _ in self.query
+			)
 		connection = duckdb.connect()
 		connection.execute("SET allow_asterisks_in_http_paths = true")
 		connection.execute("INSTALL spatial")
@@ -188,7 +200,12 @@ class GeoParquetLayer:
 				[west, east, south, north, west, south, east, north]
 			)
 
-		select_query = "SELECT * FROM read_parquet(?) WHERE " + " OR ".join(conditions)
+		select_query = "SELECT * FROM read_parquet(?) WHERE (" + " OR ".join(conditions) + ")"
+		query_parameters.extend(value for _, value in self.query)
+		if self.query:
+			select_query += " AND " + " AND ".join(
+				f"{field} = ?" for field, _ in self.query
+			)
 		for query_parameter in query_parameters:
 			if isinstance(query_parameter, str):
 				literal = "'" + query_parameter.replace("'", "''") + "'"

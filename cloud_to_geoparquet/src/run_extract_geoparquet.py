@@ -1,6 +1,7 @@
 """Export New Zealand GeoParquet examples for airport and building-point layers."""
 
 import argparse
+import ast
 import logging
 from pathlib import Path
 
@@ -39,6 +40,19 @@ def parse_extent(value: str) -> tuple[float, float, float, float]:
 		raise argparse.ArgumentTypeError(
 			"extent coordinates must be numbers"
 		) from error
+
+
+def parse_query(value: str) -> tuple[str, object]:
+	"""Parse a ``field=value`` filter for the DuckDB query."""
+	field, separator, raw_value = value.partition("=")
+	field = field.strip()
+	if not separator or not field or not raw_value.strip():
+		raise argparse.ArgumentTypeError("query must use field=value")
+	try:
+		parsed_value = ast.literal_eval(raw_value.strip())
+	except (ValueError, SyntaxError):
+		parsed_value = raw_value.strip()
+	return field, parsed_value
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -92,6 +106,14 @@ def parse_arguments() -> argparse.Namespace:
 		"--split-geometry-types",
 		action="store_true",
 		help="Split each exported file into one additional file per geometry type.",
+	)
+	parser.add_argument(
+		"--query",
+		dest="query",
+		type=parse_query,
+		action="append",
+		metavar="FIELD=VALUE",
+		help="Filter rows with a field=value condition; may be repeated.",
 	)
 	bbox_group = parser.add_mutually_exclusive_group()
 	bbox_group.add_argument(
@@ -163,6 +185,7 @@ def main() -> None:
 			date=arguments.release_date,
 			theme=url_config.get_layer_theme(layer_name),
 			url_data_path=url_config.url_data_path,
+			query=tuple(arguments.query or ()),
 		)
 		if arguments.bbox_name is not None or arguments.extent is not None:
 			output_path, copy_query = layer.export_bbox()

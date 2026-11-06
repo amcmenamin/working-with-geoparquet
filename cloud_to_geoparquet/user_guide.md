@@ -72,6 +72,17 @@ uv run python -m run_extract_geoparquet `
 This selects layers such as `coastline`, `landcover`, and `marine`, which are
 configured with the `landcover` theme. Theme matching is case-sensitive.
 
+## Query Filters
+
+Use `--query` to filter exported rows with a `field=value` condition. Quote
+string values when needed, and repeat the option for multiple conditions:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names marine `
+  --query "service='slipway'"
+```
+
 ## URL Data Paths
 
 URL bases and relative data path templates are defined in
@@ -247,13 +258,13 @@ wslc version
 From the project root, build the image with `wslc`:
 
 ```powershell
-wslc build -t geoparquet-export .
+wslc build -t gp-extract .
 ```
 
-Run the image and pass runner options:
+Run the image interactively and pass runner options:
 
 ```powershell
-wslc run --rm -v "${PWD}/exports:/app/src/exports" geoparquet-export --layer-names airport,water --bbox-name CHATHAM_ISLANDS
+wslc run --rm -it gp-extract args...
 ```
 
 See Microsoft's [Get started with containers on WSL](https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-containers)

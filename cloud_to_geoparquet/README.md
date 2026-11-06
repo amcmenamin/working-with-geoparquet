@@ -31,6 +31,12 @@ docker run --rm -v "${PWD}/exports:/app/exports" geoparquet-export --layer-names
 All runner arguments can follow the image name. Run `docker run --rm
 geoparquet-export --help` to view them.
 
+On Windows with WSL containers, build the image with:
+
+```powershell
+wslc build -t gp-extract .
+```
+
 ## Use As A Class
 
 ```python
