@@ -72,6 +72,11 @@ uv run python -m run_extract_geoparquet `
 This selects layers such as `coastline`, `landcover`, and `marine`, which are
 configured with the `landcover` theme. Theme matching is case-sensitive.
 
+When `--layer-names` is also provided, it supplies the source type and
+`--theme` overrides that type's configured source theme. This supports source
+paths where theme and type differ, such as Overture `theme=base` with
+`type=land_cover`.
+
 ## Query Filters
 
 Use `--query` to filter exported rows with a `field=value` condition. Quote
@@ -174,6 +179,41 @@ uv run python -m run_extract_geoparquet `
   --layer-names airport `
   --extent 174.7,-41.4,174.9,-41.2
 ```
+
+## GeoPackage Extents
+
+Use `--extent-geopackage` with `--extent-layer` to run one export for every
+non-null geometry in a GeoPackage layer:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names airport `
+  --extent-geopackage C:\Temp\exports\study_areas\study_areas.gpkg `
+  --extent-layer study_area
+```
+
+The layer must have a declared coordinate reference system. Each geometry is
+transformed to EPSG:4326 and its bbox becomes the export extent. Numbered files
+prevent features from overwriting one another, for example
+`airport_1.parquet`, `airport_2.parquet`, and `airport_3.parquet`.
+
+Export the Overture land-cover layer once for each study-area feature:
+
+```powershell
+uv run python run_extract_geoparquet.py `
+  --layer-names land_cover `
+  --theme base `
+  --url-data-path overture `
+  --release-date 2026-09-23.1 `
+  --extent-geopackage C:\Temp\exports\study_areas\study_areas.gpkg `
+  --extent-layer study_areas `
+  --export-folder C:\Temp\exports\overture_land_cover
+```
+
+This writes numbered outputs such as
+`C:\Temp\exports\overture_land_cover\overture\land_cover_1.parquet`.
+The remote source resolves to
+`release/2026-09-23.1/theme=base/type=land_cover/*`.
 
 ## Python Export API
 
@@ -281,7 +321,7 @@ The runner also logs the generated DuckDB `COPY` SQL to:
 ```
 
 Named bbox runs use a lowercase bbox subfolder below the selected export
-folder. Explicit extents use the export folder directly.
+folder. Explicit and GeoPackage extents use the export folder directly.
 
 ## Example Runs
 

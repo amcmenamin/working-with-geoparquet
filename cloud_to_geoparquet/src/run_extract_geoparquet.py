@@ -8,9 +8,11 @@ from pathlib import Path
 try:
 	from src.configuration import Config
 	from src.extract_geoparquet_layer import GeoParquetLayer
+	from src.read_aoi import ReadAoi
 except ModuleNotFoundError:
 	from configuration import Config
 	from extract_geoparquet_layer import GeoParquetLayer
+	from read_aoi import ReadAoi
 
 
 CONFIG = Config()
@@ -82,7 +84,10 @@ def parse_arguments() -> argparse.Namespace:
 	parser.add_argument(
 		"--theme",
 		metavar="THEME",
-		help="Export all layers in the layer configuration with this theme.",
+		help=(
+			"Source theme for --layer-names, or export all configured layers "
+			"with this theme when --layer-names is omitted."
+		),
 	)
 	parser.add_argument(
 		"--url-path-config",
@@ -127,14 +132,28 @@ def parse_arguments() -> argparse.Namespace:
 		metavar="WEST,SOUTH,EAST,NORTH",
 		help="Comma-separated bbox to export instead of all configured New Zealand regions.",
 	)
-	return parser.parse_args()
+	bbox_group.add_argument(
+		"--extent-geopackage",
+		"--extent-gpkg",
+		dest="extent_geopackage",
+		type=Path,
+		metavar="PATH",
+		help="GeoPackage containing one export geometry per feature.",
+	)
+	parser.add_argument(
+		"--extent-layer",
+		metavar="LAYER",
+		help="Layer to read from --extent-geopackage.",
+	)
+	arguments = parser.parse_args()
+	if (arguments.extent_geopackage is None) != (arguments.extent_layer is None):
+		parser.error("--extent-geopackage and --extent-layer must be used together")
+	return arguments
 
 
 def main() -> None:
 	"""Export the selected layers using the requested or default bbox coverage."""
 	arguments = parse_arguments()
-	if arguments.layer_names is not None and arguments.theme is not None:
-		raise ValueError("--layer-names and --theme cannot be used together")
 	export_folder = (
 		arguments.export_folder / arguments.bbox_name.lower()
 		if arguments.bbox_name is not None
@@ -172,35 +191,61 @@ def main() -> None:
 		url_path_config=arguments.url_path_config,
 		layer_file=arguments.layer_config,
 	)
-	for layer_name in selected_layers:
+	use_new_zealand = (
+		arguments.bbox_name is None
+		and arguments.extent is None
+		and arguments.extent_geopackage is None
+	)
+	if arguments.extent_geopackage is not None:
+		geopackage_extents = ReadAoi(
+			arguments.extent_geopackage, arguments.extent_layer
+		).read_geopackage_extents()
+		if not geopackage_extents:
+			raise ValueError(
+				f"Layer {arguments.extent_layer!r} contains no non-null geometries"
+			)
+		extent_exports = tuple(
+			(bbox, f"_{index}")
+			for index, bbox in enumerate(geopackage_extents, start=1)
+		)
+	else:
 		bbox = arguments.bbox_name or (
 			arguments.extent if arguments.extent is not None else "NZ_MAINLAND"
 		)
-		layer = GeoParquetLayer(
-			url_config.url_path,
-			layer_name,
-			bbox=bbox,
-			export_folder=export_folder,
-			data_path=url_config.data_path,
-			date=arguments.release_date,
-			theme=url_config.get_layer_theme(layer_name),
-			url_data_path=url_config.url_data_path,
-			query=tuple(arguments.query or ()),
-		)
-		if arguments.bbox_name is not None or arguments.extent is not None:
-			output_path, copy_query = layer.export_bbox()
-		else:
-			output_path, copy_query = layer.export_new_zealand()
-		print(f"Exported {layer_name} to {output_path}")
-		logger.info("COPY SQL for %s:\n%s", layer_name, copy_query)
-		if arguments.split_geometry_types:
-			for split_output_path in layer.split_geometry_types(output_path):
-				print(f"Exported {layer_name} geometry type to {split_output_path}")
-				logger.info(
-					"Split %s by geometry type to %s",
-					layer_name,
-					split_output_path,
-				)
+		extent_exports = ((bbox, ""),)
+	for layer_name in selected_layers:
+		for bbox, output_suffix in extent_exports:
+			layer_theme = (
+				arguments.theme
+				if arguments.layer_names is not None and arguments.theme is not None
+				else url_config.get_layer_theme(layer_name)
+			)
+			layer = GeoParquetLayer(
+				url_config.url_path,
+				layer_name,
+				bbox=bbox,
+				export_folder=export_folder,
+				data_path=url_config.data_path,
+				date=arguments.release_date,
+				theme=layer_theme,
+				url_data_path=url_config.url_data_path,
+				query=tuple(arguments.query or ()),
+				output_suffix=output_suffix,
+			)
+			if use_new_zealand:
+				output_path, copy_query = layer.export_new_zealand()
+			else:
+				output_path, copy_query = layer.export_bbox()
+			print(f"Exported {layer_name} to {output_path}")
+			logger.info("COPY SQL for %s:\n%s", layer_name, copy_query)
+			if arguments.split_geometry_types:
+				for split_output_path in layer.split_geometry_types(output_path):
+					print(f"Exported {layer_name} geometry type to {split_output_path}")
+					logger.info(
+						"Split %s by geometry type to %s",
+						layer_name,
+						split_output_path,
+					)
 
 
 if __name__ == "__main__":

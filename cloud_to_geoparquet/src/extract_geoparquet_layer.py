@@ -55,6 +55,7 @@ class GeoParquetLayer:
 		theme: str | None = None,
 		url_data_path: str = "nztopodev",
 		query: tuple[tuple[str, object], ...] = (),
+		output_suffix: str = "",
 	) -> None:
 		self.url_path = url_path.rstrip("/")
 		self.layer_name = layer_name
@@ -68,6 +69,7 @@ class GeoParquetLayer:
 		self.query = query
 		self.bbox = bbox
 		self.export_folder = Path(export_folder)
+		self.output_suffix = output_suffix
 
 	@property
 	def bbox(self) -> tuple[float, float, float, float]:
@@ -110,7 +112,11 @@ class GeoParquetLayer:
 	@property
 	def output_path(self) -> Path:
 		"""Return the GeoParquet export path for this layer."""
-		return self.export_folder / self.url_data_path / f"{self.layer_name}.parquet"
+		return (
+			self.export_folder
+			/ self.url_data_path
+			/ f"{self.layer_name}{self.output_suffix}.parquet"
+		)
 
 	def query_bbox(
 		self, bbox: tuple[float, float, float, float] | None = None

@@ -69,6 +69,19 @@ Use `--export-folder` to choose another output location:
   --export-folder C:\temp\geoparquet-exports
 ```
 
+Run one export per geometry in a GeoPackage layer:
+
+```powershell
+.\geoparquet-extract.exe `
+  --layer-names airport `
+  --extent-geopackage C:\Temp\exports\study_areas\study_areas.gpkg `
+  --extent-layer study_area `
+  --export-folder C:\temp\geoparquet-exports
+```
+
+These outputs are numbered by feature, such as `airport_1.parquet` and
+`airport_2.parquet`.
+
 By default, output is written below an `exports` folder in the current
 working directory. The selected URL configuration name is included in the
 output path, for example:

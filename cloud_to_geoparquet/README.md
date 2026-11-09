@@ -100,14 +100,17 @@ uv run python -m src.run_extract_geoparquet --help
 uv run python -m src.run_extract_geoparquet --layer-names airport --bbox-name CHATHAM_ISLANDS
 uv run python -m src.run_extract_geoparquet --layer-names airport,building_point
 uv run python -m src.run_extract_geoparquet --layer-names building_point --extent 174.7,-41.4,174.9,-41.2
+uv run python -m src.run_extract_geoparquet --layer-names building_point --extent-geopackage C:\Temp\exports\study_areas\study_areas.gpkg --extent-layer study_area
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --export-folder data/exports
 uv run python -m src.run_extract_geoparquet --layer-config src/config/nztopo_layers.yml --theme landcover
+uv run python -m src.run_extract_geoparquet --layer-names land_cover --theme base --url-data-path overture --release-date 2026-09-23.1 --extent-geopackage C:\Temp\exports\study_areas\study_areas.gpkg --extent-layer study_areas
 uv run python -m src.run_extract_geoparquet --layer-names buildings --url-data-path openstreetmap-layerlake --split-geometry-types
 ```
 
-`--theme` selects every layer in the layer configuration whose theme matches
-the supplied value. For example, `--theme landcover` selects layers such as
-`coastline`, `landcover`, and `marine`.
+Without `--layer-names`, `--theme` selects every configured layer whose theme
+matches the supplied value. With `--layer-names`, it overrides the source theme
+for those explicit layer types. For example, `--layer-names land_cover --theme
+base` reads Overture's `theme=base/type=land_cover` path.
 
 `--split-geometry-types` reloads each completed export and writes an additional
 file for every geometry type. For example, `buildings.parquet` can produce
@@ -192,8 +195,14 @@ QUEENSTOWN_URBAN_AREA
 INVERCARGILL_URBAN_AREA
 ```
 
-Without `--bbox-name` or `--extent`, the runner preserves the default all-regions
-New Zealand export. Each run logs its `COPY` SQL to
+`--extent-geopackage` reads every non-null geometry in the selected
+`--extent-layer`, transforms it from the GeoPackage layer's declared CRS to
+EPSG:4326, and runs one export using each geometry's bbox. Outputs are numbered
+per feature, such as `building_point_1.parquet` and
+`building_point_2.parquet`.
+
+Without `--bbox-name`, `--extent`, or `--extent-geopackage`, the runner
+preserves the default all-regions New Zealand export. Each run logs its `COPY` SQL to
 `<export-folder>/extract_geoparquet.log`.
 
 When `--bbox-name` is used, the runner appends its lowercase name to the export
