@@ -5,6 +5,9 @@ extractor. Run the Python commands from the `src` folder.
 
 Note: This is similar to the QGIS Plugin that supports downloading geoparquet via QGIS extent. See: https://github.com/cholmes/qgis_plugin_gpq_downloader/
 
+Note: ArcGIS Pro addin (current OVERTURE) also now available that support downloading geoparquet via ArcGIS Pro extent. Also additional tools.
+https://cofgisonline.maps.arcgis.com/home/item.html?id=8293d1220b7848848ce316b4fa3263b5#overview
+
 Note: Overture also has its own download tools and library: See: https://github.com/OvertureMaps/overturemaps-py/blob/main/README.md
 
 ## Default Configuration
