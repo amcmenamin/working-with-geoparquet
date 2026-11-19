@@ -178,6 +178,42 @@ SELECT * FROM airport;
 `--catalog-only` cannot be combined with `--create-catalog`,
 `--split-geometry-types`, or `--export-format duckdb`.
 
+### Catalog Existing Local GeoParquet Files
+
+Use `--catalog-folder` to create a catalog for GeoParquet files that already
+exist locally:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --catalog-folder C:\Data\temp\topographic-data-dev-67-full
+```
+
+This creates:
+
+```text
+C:\Data\temp\topographic-data-dev-67-full\catalog.duckdb
+```
+
+Every top-level `*.parquet` file becomes a view named from its file stem. For
+example:
+
+```text
+airport.parquet       -> airport
+building_point.parquet -> building_point
+road_line.parquet     -> road_line
+```
+
+The `datasets` table records each absolute file path with
+`source_kind = 'local'`. Existing local files are not downloads, so no
+`downloads` rows are added. The extent is read from the GeoParquet file-level
+bbox metadata; files without that metadata fall back to calculating their
+geometry extent.
+
+Rerunning the command refreshes matching views and preserves unrelated catalog
+entries. Only top-level files with a lowercase `.parquet` suffix are scanned.
+Deleted files are not removed from the catalog automatically. Because views
+use absolute paths, rerun the command after moving the folder.
+
 ## Select Layers
 
 Use `--layer-names` with a comma-separated list:

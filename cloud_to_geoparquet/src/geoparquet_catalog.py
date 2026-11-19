@@ -1,5 +1,6 @@
 """Maintain a local DuckDB catalog of GeoParquet-backed views."""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -75,6 +76,48 @@ class GeoParquetCatalog:
 			extents,
 			record_download=False,
 		)
+
+	def register_existing(self, parquet_path: str | Path) -> CatalogEntry:
+		"""Register an existing local GeoParquet file without a download row."""
+		source_path = Path(parquet_path).resolve()
+		if not source_path.is_file():
+			raise FileNotFoundError(f"GeoParquet file not found: {source_path}")
+		view_name = source_path.stem
+		escaped_source_path = str(source_path).replace("'", "''")
+		select_query = (
+			f"SELECT * FROM read_parquet('{escaped_source_path}')"
+		)
+		extent = CatalogExtent(
+			f"{view_name.upper()}_EXTENT",
+			self._read_geoparquet_bbox(source_path),
+		)
+		return self._register(
+			select_query,
+			view_name,
+			view_name,
+			source_path.as_uri(),
+			str(source_path),
+			"local",
+			(extent,),
+			record_download=False,
+		)
+
+	def register_folder(self, folder: str | Path) -> tuple[CatalogEntry, ...]:
+		"""Register every top-level ``*.parquet`` file in a local folder."""
+		folder_path = Path(folder).resolve()
+		if not folder_path.is_dir():
+			raise NotADirectoryError(f"Catalog folder not found: {folder_path}")
+		parquet_paths = tuple(
+			sorted(
+				folder_path.glob("*.parquet"),
+				key=lambda path: path.name.casefold(),
+			)
+		)
+		if not parquet_paths:
+			raise FileNotFoundError(
+				f"No .parquet files found in catalog folder: {folder_path}"
+			)
+		return tuple(self.register_existing(path) for path in parquet_paths)
 
 	def _register(
 		self,
@@ -250,6 +293,73 @@ class GeoParquetCatalog:
 	@staticmethod
 	def _quote_identifier(identifier: str) -> str:
 		return '"' + identifier.replace('"', '""') + '"'
+
+	@staticmethod
+	def _read_geoparquet_bbox(parquet_path: Path) -> BBox:
+		connection = duckdb.connect()
+		try:
+			metadata_rows = connection.execute(
+				"SELECT key, value FROM parquet_kv_metadata(?)",
+				[str(parquet_path)],
+			).fetchall()
+			geo_value = next(
+				(value for key, value in metadata_rows if bytes(key) == b"geo"),
+				None,
+			)
+			if geo_value is None:
+				raise ValueError(
+					f"GeoParquet metadata not found: {parquet_path}"
+				)
+			try:
+				geo_metadata = json.loads(bytes(geo_value).decode("utf-8"))
+			except (UnicodeDecodeError, json.JSONDecodeError) as error:
+				raise ValueError(
+					f"Invalid GeoParquet metadata: {parquet_path}"
+				) from error
+			primary_column = geo_metadata.get("primary_column")
+			geometry_metadata = geo_metadata.get("columns", {}).get(
+				primary_column,
+				{},
+			)
+			bbox = geometry_metadata.get("bbox")
+			if bbox is not None:
+				if len(bbox) == 4:
+					return tuple(float(value) for value in bbox)
+				if len(bbox) == 6:
+					return (
+						float(bbox[0]),
+						float(bbox[1]),
+						float(bbox[3]),
+						float(bbox[4]),
+					)
+				raise ValueError(
+					f"Unsupported GeoParquet bbox: {parquet_path}"
+				)
+			if not isinstance(primary_column, str) or not primary_column:
+				raise ValueError(
+					f"GeoParquet primary geometry column not found: {parquet_path}"
+				)
+			connection.execute("INSTALL spatial")
+			connection.execute("LOAD spatial")
+			quoted_geometry = GeoParquetCatalog._quote_identifier(primary_column)
+			extent = connection.execute(
+				f"""
+				SELECT ST_XMin(extent), ST_YMin(extent),
+				       ST_XMax(extent), ST_YMax(extent)
+				FROM (
+					SELECT ST_Extent_Agg({quoted_geometry}) AS extent
+					FROM read_parquet(?)
+				)
+				""",
+				[str(parquet_path)],
+			).fetchone()
+			if extent is None or any(value is None for value in extent):
+				raise ValueError(
+					f"Unable to derive GeoParquet extent: {parquet_path}"
+				)
+			return tuple(float(value) for value in extent)
+		finally:
+			connection.close()
 
 	@staticmethod
 	def _upsert_dataset(

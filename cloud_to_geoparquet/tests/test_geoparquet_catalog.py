@@ -180,3 +180,33 @@ def test_catalog_adds_extent_name_to_existing_metadata_table(
 		assert connection.execute(
 			"SELECT extent_name FROM extents WHERE view_name = 'roads'"
 		).fetchone() == ("HAMILTON_URBAN_AREA",)
+
+
+def test_catalog_registers_existing_geoparquet_folder_without_downloads(
+	tmp_path: Path,
+) -> None:
+	_write_parquet(tmp_path / "roads.parquet", ((1, "road"), (2, "road"),))
+	_write_parquet(tmp_path / "rivers.parquet", ((3, "river"),))
+	catalog_path = tmp_path / "catalog.duckdb"
+
+	entries = GeoParquetCatalog(catalog_path).register_folder(tmp_path)
+
+	assert [entry.view_name for entry in entries] == ["rivers", "roads"]
+	with duckdb.connect(str(catalog_path)) as connection:
+		connection.execute("LOAD spatial")
+		assert connection.execute(
+			"SELECT id FROM roads ORDER BY id"
+		).fetchall() == [(1,), (2,)]
+		assert connection.execute(
+			"SELECT id FROM rivers"
+		).fetchall() == [(3,)]
+		assert connection.execute(
+			"SELECT view_name, source_kind FROM datasets ORDER BY view_name"
+		).fetchall() == [("rivers", "local"), ("roads", "local")]
+		assert connection.execute("SELECT count(*) FROM downloads").fetchone() == (0,)
+		assert connection.execute(
+			"SELECT view_name, extent_name FROM extents ORDER BY view_name"
+		).fetchall() == [
+			("rivers", "RIVERS_EXTENT"),
+			("roads", "ROADS_EXTENT"),
+		]

@@ -139,6 +139,12 @@ def parse_arguments() -> argparse.Namespace:
 		help="Create filtered remote-backed catalog views without exporting files.",
 	)
 	parser.add_argument(
+		"--catalog-folder",
+		type=Path,
+		metavar="PATH",
+		help="Catalog existing top-level *.parquet files in a local folder.",
+	)
+	parser.add_argument(
 		"--query",
 		dest="query",
 		type=parse_query,
@@ -188,12 +194,45 @@ def parse_arguments() -> argparse.Namespace:
 		parser.error("--catalog-only cannot be combined with --create-catalog")
 	if arguments.catalog_only and arguments.split_geometry_types:
 		parser.error("--catalog-only cannot be combined with --split-geometry-types")
+	if arguments.catalog_folder is not None:
+		if arguments.create_catalog or arguments.catalog_only:
+			parser.error(
+				"--catalog-folder cannot be combined with other catalog modes"
+			)
+		if arguments.export_format != "parquet" or arguments.database_path is not None:
+			parser.error("--catalog-folder cannot be combined with DuckDB export")
+		if arguments.split_geometry_types:
+			parser.error("--catalog-folder cannot split geometry types")
+		if (
+			arguments.layer_names is not None
+			or arguments.layer_config is not None
+			or arguments.theme is not None
+			or arguments.release_date is not None
+			or arguments.query is not None
+			or arguments.bbox_name is not None
+			or arguments.extent is not None
+			or arguments.extent_geopackage is not None
+		):
+			parser.error(
+				"--catalog-folder cannot be combined with source or extent options"
+			)
 	return arguments
 
 
 def main() -> None:
 	"""Export the selected layers using the requested or default bbox coverage."""
 	arguments = parse_arguments()
+	if arguments.catalog_folder is not None:
+		catalog_path = arguments.catalog_folder / "catalog.duckdb"
+		entries = GeoParquetCatalog(catalog_path).register_folder(
+			arguments.catalog_folder
+		)
+		for entry in entries:
+			print(
+				f"Cataloged local {entry.view_name}.parquet as "
+				f"{entry.view_name} in {entry.catalog_path}"
+			)
+		return
 	export_folder = (
 		arguments.export_folder / arguments.bbox_name.lower()
 		if arguments.bbox_name is not None
