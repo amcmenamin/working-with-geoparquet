@@ -90,7 +90,8 @@ bands and 11,695,104 cells, so its output contains that many polygon rows.
 `raster-to-bands` reads the raster in windows and writes one single-band
 GeoTIFF per source band. For example, `raster_60G_20_16_3.tif` produces files
 named `raster_60G_20_16_3_band_1.tif`, `raster_60G_20_16_3_band_2.tif`, and so
-on.
+on. The `RasterToBands` class is in `src/raster_to_bands.py`, and its
+command-line handling is in `src/raster_to_bands_cli.py`.
 
 Use the default cloud raster from Windows Command Prompt:
 

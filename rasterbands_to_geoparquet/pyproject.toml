@@ -15,7 +15,7 @@ dependencies = [
 
 [project.scripts]
 rasterbands-to-geoparquet = "src.raster_to_parquet_cli:main"
-raster-to-bands = "src.raster_to_bands:main"
+raster-to-bands = "src.raster_to_bands_cli:main"
 
 [build-system]
 requires = ["hatchling"]
