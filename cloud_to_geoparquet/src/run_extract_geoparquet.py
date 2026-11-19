@@ -8,10 +8,12 @@ from pathlib import Path
 try:
 	from src.configuration import Config
 	from src.extract_geoparquet_layer import GeoParquetLayer
+	from src.geoparquet_catalog import CatalogExtent, GeoParquetCatalog
 	from src.read_aoi import ReadAoi
 except ModuleNotFoundError:
 	from configuration import Config
 	from extract_geoparquet_layer import GeoParquetLayer
+	from geoparquet_catalog import CatalogExtent, GeoParquetCatalog
 	from read_aoi import ReadAoi
 
 
@@ -125,6 +127,18 @@ def parse_arguments() -> argparse.Namespace:
 		help="Split each exported file into one additional file per geometry type.",
 	)
 	parser.add_argument(
+		"--create-catalog",
+		"--catalog",
+		action="store_true",
+		dest="create_catalog",
+		help="Create or update catalog.duckdb beside each GeoParquet export.",
+	)
+	parser.add_argument(
+		"--catalog-only",
+		action="store_true",
+		help="Create filtered remote-backed catalog views without exporting files.",
+	)
+	parser.add_argument(
 		"--query",
 		dest="query",
 		type=parse_query,
@@ -166,6 +180,14 @@ def parse_arguments() -> argparse.Namespace:
 		parser.error("--database-path requires --export-format duckdb")
 	if arguments.export_format == "duckdb" and arguments.split_geometry_types:
 		parser.error("--split-geometry-types requires --export-format parquet")
+	if arguments.export_format == "duckdb" and arguments.create_catalog:
+		parser.error("--create-catalog requires --export-format parquet")
+	if arguments.export_format == "duckdb" and arguments.catalog_only:
+		parser.error("--catalog-only requires --export-format parquet")
+	if arguments.catalog_only and arguments.create_catalog:
+		parser.error("--catalog-only cannot be combined with --create-catalog")
+	if arguments.catalog_only and arguments.split_geometry_types:
+		parser.error("--catalog-only cannot be combined with --split-geometry-types")
 	return arguments
 
 
@@ -177,12 +199,13 @@ def main() -> None:
 		if arguments.bbox_name is not None
 		else arguments.export_folder
 	)
-	export_folder.mkdir(parents=True, exist_ok=True)
-	logging.basicConfig(
-		filename=export_folder / "extract_geoparquet.log",
-		level=logging.INFO,
-		format="%(asctime)s %(levelname)s %(message)s",
-	)
+	if not arguments.catalog_only:
+		export_folder.mkdir(parents=True, exist_ok=True)
+		logging.basicConfig(
+			filename=export_folder / "extract_geoparquet.log",
+			level=logging.INFO,
+			format="%(asctime)s %(levelname)s %(message)s",
+		)
 	layer_config = (
 		Config(layer_file=arguments.layer_config)
 		if arguments.layer_config is not None
@@ -253,6 +276,42 @@ def main() -> None:
 				database_path=arguments.database_path,
 			)
 			if use_new_zealand:
+				catalog_extents = tuple(
+					CatalogExtent(name, layer.NAMED_BBOXES[name])
+					for name in layer.NZ_BBOX_NAMES
+				)
+			elif isinstance(bbox, str):
+				catalog_extents = (CatalogExtent(bbox, layer.bbox),)
+			elif arguments.extent_geopackage is not None:
+				extent_index = output_suffix.removeprefix("_")
+				catalog_extents = (
+					CatalogExtent(
+						f"{arguments.extent_layer}_{extent_index}",
+						layer.bbox,
+					),
+				)
+			else:
+				catalog_extents = (
+					CatalogExtent("EXPLICIT_EXTENT", layer.bbox),
+				)
+			export_bboxes = [extent.bbox for extent in catalog_extents]
+			if arguments.catalog_only:
+				catalog = GeoParquetCatalog(
+					layer.output_path.parent / "catalog.duckdb"
+				)
+				entry = catalog.register_remote(
+					layer.build_select_query(export_bboxes),
+					layer.output_table_name,
+					layer.layer_name,
+					layer.parquet_url,
+					catalog_extents,
+				)
+				print(
+					f"Cataloged remote {layer_name} as {entry.view_name} "
+					f"in {entry.catalog_path}"
+				)
+				continue
+			if use_new_zealand:
 				output_path, copy_query = layer.export_new_zealand()
 			else:
 				output_path, copy_query = layer.export_bbox()
@@ -264,6 +323,23 @@ def main() -> None:
 			else:
 				print(f"Exported {layer_name} to {output_path}")
 			logger.info("Export SQL for %s:\n%s", layer_name, copy_query)
+			catalog = (
+				GeoParquetCatalog(output_path.parent / "catalog.duckdb")
+				if arguments.create_catalog
+				else None
+			)
+			if catalog is not None:
+				entry = catalog.register(
+					output_path,
+					layer.output_table_name,
+					layer.layer_name,
+					layer.parquet_url,
+					catalog_extents,
+				)
+				print(
+					f"Cataloged {output_path.name} as {entry.view_name} "
+					f"in {entry.catalog_path}"
+				)
 			if arguments.split_geometry_types:
 				for split_output_path in layer.split_geometry_types(output_path):
 					print(f"Exported {layer_name} geometry type to {split_output_path}")
@@ -272,6 +348,18 @@ def main() -> None:
 						layer_name,
 						split_output_path,
 					)
+					if catalog is not None:
+						entry = catalog.register(
+							split_output_path,
+							split_output_path.stem,
+							layer.layer_name,
+							layer.parquet_url,
+							catalog_extents,
+						)
+						print(
+							f"Cataloged {split_output_path.name} as "
+							f"{entry.view_name} in {entry.catalog_path}"
+						)
 
 
 if __name__ == "__main__":

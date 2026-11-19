@@ -101,6 +101,79 @@ table, such as `airport` or `building_point`. The export stops with an error if
 the target table already exists. `--split-geometry-types` is available only
 for Parquet exports.
 
+## Create A Local GeoParquet Catalog
+
+Use `--create-catalog` to keep the normal GeoParquet exports and create a
+`catalog.duckdb` beside them. Each exported file is registered as a DuckDB view
+that reads the Parquet file:
+
+```powershell
+uv run python -m src.run_extract_geoparquet `
+	--layer-names airport,building_point `
+	--bbox-name CHATHAM_ISLANDS `
+	--create-catalog
+```
+
+The resulting folder contains the Parquet files and catalog:
+
+```text
+catalog.duckdb
+airport.parquet
+building_point.parquet
+```
+
+The catalog contains `airport` and `building_point` views plus metadata tables:
+
+- `datasets`: current view, layer, source URL, and local Parquet path.
+- `downloads`: append-only export time, file size, and row count history.
+- `extents`: named bounding boxes associated with each view.
+
+Configured bboxes retain names such as `NZ_MAINLAND` or
+`HAMILTON_URBAN_AREA`. Direct `--extent` values use `EXPLICIT_EXTENT`, and
+GeoPackage features use `<layer>_<index>`. Existing catalogs are migrated with
+the new `extent_name` column when next updated.
+
+Rerunning an export replaces its view definition and current metadata while
+adding another `downloads` row. Existing unrelated views remain in the
+database. When `--split-geometry-types` is also supplied, each split Parquet
+file is registered as another view.
+
+Catalog mode differs from `--export-format duckdb`: catalog mode retains
+Parquet files and creates views over them, while DuckDB export copies the data
+into physical database tables.
+
+### Remote Catalog Without Downloads
+
+Use `--catalog-only` to create `catalog.duckdb` without writing local Parquet
+files. Each view reads the configured remote GeoParquet source and retains the
+requested bbox and `--query` filters:
+
+```powershell
+uv run python -m src.run_extract_geoparquet `
+	--catalog-only `
+	--export-folder C:\Temp\geoparquet-catalog
+```
+
+With the default source, the database is created at
+`C:\Temp\geoparquet-catalog\nztopodev\catalog.duckdb`. Its `datasets` rows use
+`source_kind = 'remote'` and store the remote path. No `downloads` rows or
+local Parquet files are created.
+
+Remote views require network access. Load DuckDB HTTPFS and Spatial before
+querying them:
+
+```sql
+INSTALL httpfs;
+LOAD httpfs;
+INSTALL spatial;
+LOAD spatial;
+SET allow_asterisks_in_http_paths = true;
+SELECT * FROM airport;
+```
+
+`--catalog-only` cannot be combined with `--create-catalog`,
+`--split-geometry-types`, or `--export-format duckdb`.
+
 ## Runner
 
 Run the default airport and building-point exports for all configured New

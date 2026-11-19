@@ -41,6 +41,7 @@ class GeoParquetLayer:
 	"""
 
 	BBOXES = NAMED_BBOX_CONFIG
+	NZ_BBOX_NAMES = NZ_BBOX_NAMES
 	NZ_BBOXES = {NAMED_BBOX_CONFIG.get_bbox(name) for name in NZ_BBOX_NAMES}
 	NAMED_BBOXES = NAMED_BBOX_CONFIG.as_mapping()
 
@@ -201,6 +202,14 @@ class GeoParquetLayer:
 		| tuple[tuple[float, float, float, float], ...],
 	) -> tuple[Path, str]:
 		"""Export rows and return the artifact path and executed SQL."""
+		return self._export_select_query(self.build_select_query(bboxes))
+
+	def build_select_query(
+		self, bboxes: set[tuple[float, float, float, float]]
+		| tuple[tuple[float, float, float, float], ...]
+		| list[tuple[float, float, float, float]],
+	) -> str:
+		"""Build the filtered SELECT used by exports and remote catalog views."""
 		if not bboxes:
 			raise ValueError("at least one bbox is required for export")
 
@@ -235,7 +244,7 @@ class GeoParquetLayer:
 				literal = str(query_parameter)
 			select_query = select_query.replace("?", literal, 1)
 
-		return self._export_select_query(select_query)
+		return select_query
 
 	def _export_select_query(self, select_query: str) -> tuple[Path, str]:
 		"""Export a complete SELECT query to the configured destination."""

@@ -82,6 +82,102 @@ exists, new layer tables are added without removing existing tables. Exporting
 a layer whose table already exists stops with an error. Geometry-type splitting
 is supported only for Parquet exports.
 
+## Create A GeoParquet Catalog
+
+Use `--create-catalog` to export GeoParquet normally and create a
+`catalog.duckdb` database in the same folder as the exported files:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names airport,building_point `
+  --bbox-name CHATHAM_ISLANDS `
+  --create-catalog
+```
+
+The database contains a view for each file. Conceptually, an `airport` view is:
+
+```sql
+CREATE VIEW airport AS
+SELECT *
+FROM read_parquet('airport.parquet');
+```
+
+The actual catalog stores an absolute Parquet path so the view continues to
+work regardless of the process working directory. Query the view and metadata
+with DuckDB:
+
+```sql
+INSTALL spatial;
+LOAD spatial;
+SELECT * FROM airport;
+SELECT * FROM datasets ORDER BY view_name;
+SELECT * FROM downloads ORDER BY downloaded_at DESC;
+SELECT * FROM extents ORDER BY view_name, extent_index;
+```
+
+The catalog includes:
+
+- `datasets`: one current row per view with its layer, source URL, and file.
+- `downloads`: append-only export history with file size and row count.
+- `extents`: the named bounding boxes used to create each export.
+
+The `extent_name` column retains configured names such as `NZ_MAINLAND`,
+`CHATHAM_ISLANDS`, or `HAMILTON_URBAN_AREA`. Direct `--extent` values use
+`EXPLICIT_EXTENT`. GeoPackage features use `<layer>_<index>`, for example
+`study_areas_1`. Existing catalogs receive the column automatically the next
+time they are updated; previously stored rows remain null until their view is
+registered again.
+
+If the catalog already exists, new views are added. Re-exporting an existing
+view replaces its definition and current metadata while retaining its download
+history. `--split-geometry-types` also registers every split output as a view.
+
+This differs from `--export-format duckdb`, which copies rows into physical
+DuckDB tables instead of retaining Parquet-backed views.
+
+### Catalog Remote GeoParquet Without Downloading
+
+Use `--catalog-only` when the catalog should point directly at the configured
+HTTP or S3 GeoParquet source and no local Parquet export is required:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --catalog-only `
+  --export-folder C:\Temp\geoparquet-catalog
+```
+
+The default command creates:
+
+```text
+C:\Temp\geoparquet-catalog\nztopodev\catalog.duckdb
+```
+
+It creates filtered `airport` and `building_point` views using the configured
+remote paths and the default New Zealand extents. Named bboxes, explicit
+extents, GeoPackage extents, and `--query` filters are retained in each view
+definition.
+
+The `datasets` table records `source_kind = 'remote'` and stores the remote
+GeoParquet path. Because no local file is produced, no row is added to
+`downloads`. Creating and querying the view can still make HTTP range and
+metadata requests to the remote source.
+
+Before querying remote catalog views in a new DuckDB connection, configure the
+required extensions and HTTP wildcard support:
+
+```sql
+INSTALL httpfs;
+LOAD httpfs;
+INSTALL spatial;
+LOAD spatial;
+SET allow_asterisks_in_http_paths = true;
+
+SELECT * FROM airport;
+```
+
+`--catalog-only` cannot be combined with `--create-catalog`,
+`--split-geometry-types`, or `--export-format duckdb`.
+
 ## Select Layers
 
 Use `--layer-names` with a comma-separated list:

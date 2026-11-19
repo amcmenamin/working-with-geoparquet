@@ -124,6 +124,38 @@ uv run raster-to-bands \
 Existing output files are protected by default. Pass `--overwrite` to replace
 them.
 
+## Polygonise equal-value regions
+
+`raster-polygonize` reads one band at a time and merges connected cells that
+have the same value. It writes one GeoParquet file per band with `band`,
+`value`, and `geometry` columns. By default, cells must share an edge to be
+merged (4-neighbour connectivity), and nodata regions are excluded.
+
+Polygonise the default cloud raster from Windows Command Prompt:
+
+```cmd
+uv run raster-polygonize --output-folder exports\polygons
+```
+
+Polygonise the default cloud raster from Linux:
+
+```bash
+uv run raster-polygonize --output-folder exports/polygons
+```
+
+Polygonise a local raster:
+
+```cmd
+uv run raster-polygonize ^
+  --input-path C:\data\source.tif ^
+  --output-folder exports\polygons
+```
+
+For a source named `source.tif`, outputs are named
+`source_band_1.parquet`, `source_band_2.parquet`, and so on. Use
+`--connectivity 8` to merge diagonally touching cells, `--include-nodata` to
+retain nodata regions, and `--overwrite` to replace existing outputs.
+
 ## Test
 
 ```powershell

@@ -113,7 +113,7 @@ def _window_geodataframe(dataset: DatasetReader, window: Window) -> gpd.GeoDataF
     )
 
 
-def _set_dataset_bbox(schema: pa.Schema, bounds: Sequence[float]) -> pa.Schema:
+def set_dataset_bbox(schema: pa.Schema, bounds: Sequence[float]) -> pa.Schema:
     metadata = dict(schema.metadata or {})
     geo = json.loads(metadata[b"geo"])
     primary_column = geo["primary_column"]
@@ -171,7 +171,7 @@ def raster_to_geoparquet(
                                 dataset.bounds.right,
                                 dataset.bounds.top,
                             )
-                            schema = _set_dataset_bbox(table.schema, bounds)
+                            schema = set_dataset_bbox(table.schema, bounds)
                             table = table.cast(schema)
                             writer = pq.ParquetWriter(
                                 temporary_destination,
