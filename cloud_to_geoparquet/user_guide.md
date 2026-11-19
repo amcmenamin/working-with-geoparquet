@@ -47,6 +47,41 @@ For manual runs and PyInstaller executable builds, see
 [PYINSTALLER.md](PYINSTALLER.md). Its commands run from the project root;
 the source-module commands in this guide continue to run from `src`.
 
+## Export To DuckDB
+
+To write layers into a DuckDB database instead, select the DuckDB format and
+provide a database path:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names airport,building_point `
+  --bbox-name CHATHAM_ISLANDS `
+  --export-format duckdb `
+  --database-path C:\Temp\exports\nztopo.duckdb
+```
+
+This creates `airport` and `building_point` tables. Inspect the database with
+the DuckDB Python API:
+
+```powershell
+uv run python -c "import duckdb; connection = duckdb.connect(r'C:\Temp\exports\nztopo.duckdb'); print(connection.execute('SHOW TABLES').fetchall())"
+```
+
+Add another layer to the same database by reusing the database path:
+
+```powershell
+uv run python -m run_extract_geoparquet `
+  --layer-names coastline `
+  --bbox-name CHATHAM_ISLANDS `
+  --export-format duckdb `
+  --database-path C:\Temp\exports\nztopo.duckdb
+```
+
+Each layer is created as a table named after the layer. If the database already
+exists, new layer tables are added without removing existing tables. Exporting
+a layer whose table already exists stops with an error. Geometry-type splitting
+is supported only for Parquet exports.
+
 ## Select Layers
 
 Use `--layer-names` with a comma-separated list:

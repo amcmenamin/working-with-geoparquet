@@ -56,6 +56,8 @@ class GeoParquetLayer:
 		url_data_path: str = "nztopodev",
 		query: tuple[tuple[str, object], ...] = (),
 		output_suffix: str = "",
+		export_format: str = "parquet",
+		database_path: str | Path | None = None,
 	) -> None:
 		self.url_path = url_path.rstrip("/")
 		self.layer_name = layer_name
@@ -70,6 +72,12 @@ class GeoParquetLayer:
 		self.bbox = bbox
 		self.export_folder = Path(export_folder)
 		self.output_suffix = output_suffix
+		if export_format not in {"parquet", "duckdb"}:
+			raise ValueError("export_format must be 'parquet' or 'duckdb'")
+		if export_format == "duckdb" and database_path is None:
+			raise ValueError("database_path is required for DuckDB export")
+		self.export_format = export_format
+		self.database_path = Path(database_path) if database_path is not None else None
 
 	@property
 	def bbox(self) -> tuple[float, float, float, float]:
@@ -111,12 +119,20 @@ class GeoParquetLayer:
 
 	@property
 	def output_path(self) -> Path:
-		"""Return the GeoParquet export path for this layer."""
+		"""Return the configured export artifact path for this layer."""
+		if self.export_format == "duckdb":
+			assert self.database_path is not None
+			return self.database_path
 		return (
 			self.export_folder
 			/ self.url_data_path
 			/ f"{self.layer_name}{self.output_suffix}.parquet"
 		)
+
+	@property
+	def output_table_name(self) -> str:
+		"""Return the DuckDB table name for this layer export."""
+		return f"{self.layer_name}{self.output_suffix}"
 
 	def query_bbox(
 		self, bbox: tuple[float, float, float, float] | None = None
@@ -184,7 +200,7 @@ class GeoParquetLayer:
 		self, bboxes: set[tuple[float, float, float, float]]
 		| tuple[tuple[float, float, float, float], ...],
 	) -> tuple[Path, str]:
-		"""Export rows and return the GeoParquet path and executed COPY SQL."""
+		"""Export rows and return the artifact path and executed SQL."""
 		if not bboxes:
 			raise ValueError("at least one bbox is required for export")
 
@@ -219,21 +235,60 @@ class GeoParquetLayer:
 				literal = str(query_parameter)
 			select_query = select_query.replace("?", literal, 1)
 
+		return self._export_select_query(select_query)
+
+	def _export_select_query(self, select_query: str) -> tuple[Path, str]:
+		"""Export a complete SELECT query to the configured destination."""
 		self.output_path.parent.mkdir(parents=True, exist_ok=True)
-		escaped_output_path = str(self.output_path).replace("'", "''")
-		copy_query = (
-			f"COPY ({select_query}) TO '{escaped_output_path}' "
-			"(FORMAT PARQUET, COMPRESSION ZSTD)"
+		if self.export_format == "parquet":
+			escaped_output_path = str(self.output_path).replace("'", "''")
+			export_query = (
+				f"COPY ({select_query}) TO '{escaped_output_path}' "
+				"(FORMAT PARQUET, COMPRESSION ZSTD)"
+			)
+			connection = duckdb.connect()
+			try:
+				self._configure_connection(connection)
+				connection.execute(export_query)
+			finally:
+				connection.close()
+			return self.output_path, export_query
+
+		quoted_table_name = (
+			'"' + self.output_table_name.replace('"', '""') + '"'
 		)
-		connection = duckdb.connect()
+		connection = duckdb.connect(str(self.output_path))
+		try:
+			self._configure_connection(connection)
+			existing_table = connection.execute(
+				"""
+				SELECT 1
+				FROM information_schema.tables
+				WHERE table_schema = 'main' AND table_name = ?
+				""",
+				[self.output_table_name],
+			).fetchone()
+			if existing_table is not None:
+				raise FileExistsError(
+					f"DuckDB table already exists: {self.output_table_name}"
+				)
+			export_query = f"CREATE TABLE {quoted_table_name} AS {select_query}"
+			connection.execute(export_query)
+		finally:
+			connection.close()
+		return self.output_path, export_query
+
+	@staticmethod
+	def _configure_connection(connection: duckdb.DuckDBPyConnection) -> None:
+		"""Configure DuckDB for remote GeoParquet and spatial queries."""
 		connection.execute("SET allow_asterisks_in_http_paths = true")
 		connection.execute("INSTALL spatial")
 		connection.execute("LOAD spatial")
-		connection.execute(copy_query)
-		return self.output_path, copy_query
 
 	def split_geometry_types(self, input_path: str | Path | None = None) -> tuple[Path, ...]:
 		"""Split an exported GeoParquet file into one file per geometry type."""
+		if self.export_format != "parquet":
+			raise ValueError("geometry type splitting requires Parquet export")
 		source_path = Path(input_path) if input_path is not None else self.output_path
 		if not source_path.is_file():
 			raise FileNotFoundError(f"GeoParquet export not found: {source_path}")

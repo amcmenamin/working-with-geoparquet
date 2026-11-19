@@ -83,6 +83,24 @@ print(copy_sql)  # full DuckDB COPY command
 Use `export_new_zealand()` to export all configured mainland and offshore
 regions into one file.
 
+## Export To DuckDB
+
+Use `--export-format duckdb` with `--database-path` to write each selected
+layer to a table instead of creating a GeoParquet file:
+
+```powershell
+uv run python -m src.run_extract_geoparquet `
+	--layer-names airport,building_point `
+	--bbox-name CHATHAM_ISLANDS `
+	--export-format duckdb `
+	--database-path exports\nztopo.duckdb
+```
+
+An existing database is retained and each new layer is added as a separate
+table, such as `airport` or `building_point`. The export stops with an error if
+the target table already exists. `--split-geometry-types` is available only
+for Parquet exports.
+
 ## Runner
 
 Run the default airport and building-point exports for all configured New

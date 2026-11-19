@@ -105,7 +105,19 @@ def parse_arguments() -> argparse.Namespace:
 		"--export-folder",
 		type=Path,
 		default=EXPORT_FOLDER,
-		help="Folder for GeoParquet files and extract_geoparquet.log (default: %(default)s).",
+		help="Folder for exports and extract_geoparquet.log (default: %(default)s).",
+	)
+	parser.add_argument(
+		"--export-format",
+		choices=("parquet", "duckdb"),
+		default="parquet",
+		help="Export each layer to GeoParquet or a DuckDB table (default: %(default)s).",
+	)
+	parser.add_argument(
+		"--database-path",
+		type=Path,
+		metavar="PATH",
+		help="DuckDB database path; required with --export-format duckdb.",
 	)
 	parser.add_argument(
 		"--split-geometry-types",
@@ -148,6 +160,12 @@ def parse_arguments() -> argparse.Namespace:
 	arguments = parser.parse_args()
 	if (arguments.extent_geopackage is None) != (arguments.extent_layer is None):
 		parser.error("--extent-geopackage and --extent-layer must be used together")
+	if arguments.export_format == "duckdb" and arguments.database_path is None:
+		parser.error("--database-path is required with --export-format duckdb")
+	if arguments.export_format == "parquet" and arguments.database_path is not None:
+		parser.error("--database-path requires --export-format duckdb")
+	if arguments.export_format == "duckdb" and arguments.split_geometry_types:
+		parser.error("--split-geometry-types requires --export-format parquet")
 	return arguments
 
 
@@ -231,13 +249,21 @@ def main() -> None:
 				url_data_path=url_config.url_data_path,
 				query=tuple(arguments.query or ()),
 				output_suffix=output_suffix,
+				export_format=arguments.export_format,
+				database_path=arguments.database_path,
 			)
 			if use_new_zealand:
 				output_path, copy_query = layer.export_new_zealand()
 			else:
 				output_path, copy_query = layer.export_bbox()
-			print(f"Exported {layer_name} to {output_path}")
-			logger.info("COPY SQL for %s:\n%s", layer_name, copy_query)
+			if arguments.export_format == "duckdb":
+				print(
+					f"Exported {layer_name} to table "
+					f"{layer.output_table_name} in {output_path}"
+				)
+			else:
+				print(f"Exported {layer_name} to {output_path}")
+			logger.info("Export SQL for %s:\n%s", layer_name, copy_query)
 			if arguments.split_geometry_types:
 				for split_output_path in layer.split_geometry_types(output_path):
 					print(f"Exported {layer_name} geometry type to {split_output_path}")
